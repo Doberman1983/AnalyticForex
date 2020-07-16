@@ -14,7 +14,7 @@ public class Main {
         stmt = conn.createStatement();
     }
 
-    public static void insert_db(String csv_name,String table) throws IOException {
+    public static void insert_db(String csv_name,String table) throws IOException, SQLException {
 
         FileReader file = null;
         try {
@@ -28,11 +28,16 @@ public class Main {
 
         java.sql.Date sqld;
         java.sql.Time sqlt;
+        int a = 0;
+        PreparedStatement prs;
+        conn.setAutoCommit(false);
 
-        while ((str=br.readLine())!=null) {
+        long tm = System.currentTimeMillis();
+
+       /* while ((str=br.readLine())!=null) {
 
             try {
-                PreparedStatement prs = conn.prepareStatement("INSERT INTO "+table +" (Date,Time, Open,High,Law,Close) " +
+                prs = conn.prepareStatement("INSERT INTO "+table +" (Date,Time, Open,High,Law,Close) " +
                         "VALUES (?,?,?,?,?,?)");
                 jj = getInfo(str);
                 sqld = new java.sql.Date(jj.date.getTime());
@@ -43,11 +48,49 @@ public class Main {
                 prs.setDouble(4, jj.h);
                 prs.setDouble(5, jj.l);
                 prs.setDouble(6, jj.c);
-                int rs = prs.executeUpdate();
+                prs.addBatch();
+                a++;
+                //int rs = prs.executeUpdate();
+                if (a==100) {
+                    a=0;
+                    prs.executeBatch();
+                }
+            } catch (SQLException throwables) {
+                throwables.printStackTrace();
+            }
+        }*/
+        //prs.executeBatch();
+        prs = conn.prepareStatement("INSERT INTO "+table +" (Date,Time, Open,High,Law,Close) " +
+                "VALUES (?,?,?,?,?,?)");
+
+        while ((str=br.readLine())!=null) {
+
+            try {
+
+                jj = getInfo(str);
+                sqld = new java.sql.Date(jj.date.getTime());
+                sqlt = new java.sql.Time(jj.date.getTime());
+                prs.setDate(1, sqld);
+                prs.setTime(2, sqlt);
+                prs.setDouble(3, jj.o);
+                prs.setDouble(4, jj.h);
+                prs.setDouble(5, jj.l);
+                prs.setDouble(6, jj.c);
+                prs.addBatch();
+                a++;
+                //int rs = prs.executeUpdate();
+                if (a==100) {
+                    a=0;
+                    prs.executeBatch();
+                }
             } catch (SQLException throwables) {
                 throwables.printStackTrace();
             }
         }
+
+        prs.executeBatch();
+        conn.setAutoCommit(true);
+        System.out.println("Время выпонения "+ (System.currentTimeMillis()-tm));
     }
 
     public static void disconnect() throws SQLException {
@@ -106,7 +149,7 @@ public class Main {
         }
 
       /*try {
-            insert_db("EURUSD240.csv","EURUSD_H4");
+            insert_db("GBPUSD240.csv","GBPUSD_H4");
         } catch (IOException e) {
             e.printStackTrace();
         }*/
@@ -114,7 +157,7 @@ public class Main {
         /*Date ll = new Date(1158159600000l);
         System.out.println(ll);*/
 
-        getCandle("EURUSD_H4","2010.12.02,08:00",false);
+        //getCandle("EURUSD_H4","2010.12.02,08:00",false);
 
         disconnect();
 
