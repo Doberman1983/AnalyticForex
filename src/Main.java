@@ -5,6 +5,10 @@ import java.util.Date;
 
 public class Main {
 
+    enum Trend {
+        BULL, BEAR, FLAT
+    }
+
     private static Connection conn;
     private static Statement stmt;
 
@@ -120,8 +124,9 @@ public class Main {
 
     }
 
-    public static void getCandle(String table, String date, boolean tf) throws SQLException, ParseException {
+    public static OHLC getCandle(String table, String date, boolean tf) throws SQLException, ParseException {
         // true - d1, false - h4
+        OHLC r = new OHLC();
         ResultSet rs = null;
         Date rr = new SimpleDateFormat("yyyy.MM.dd,hh:mm").parse(date);
         System.out.println(rr);
@@ -133,8 +138,92 @@ public class Main {
             throwables.printStackTrace();
         }
         while (rs.next()) {
-            System.out.println(rs.getInt(1) + " " + rs.getDate("Date") + " " + rs.getTime(3)
-                    + " " + rs.getDouble(4)+ " " + rs.getDouble(5)+ " " + rs.getDouble(6)+ " " + rs.getDouble(7));
+            r.date = rs.getDate("Date");
+            r.o = rs.getDouble(4);
+            r.h = rs.getDouble(5);
+            r.l = rs.getDouble(6);
+            r.c = rs.getDouble(7);
+            System.out.println(rs.getInt(1) + " " + r.date + " " + rs.getTime(3)
+                    + " " + r.o + " " + r.h + " " + r.l + " " + r.c);
+        }
+    return r;
+    }
+
+    public static OHLC getCandle(String table, int id) throws SQLException, ParseException {
+        ResultSet rs = null;
+        OHLC r = new OHLC();
+
+        try {
+            rs = stmt.executeQuery("SELECT * FROM "+table+" WHERE id=" + id);
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+        }
+        while (rs.next()) {
+            r.date = rs.getDate("Date");
+            r.o = rs.getDouble(4);
+            r.h = rs.getDouble(5);
+            r.l = rs.getDouble(6);
+            r.c = rs.getDouble(7);
+            //System.out.println(rs.getInt(1) + " " + r.date + " " + rs.getTime(3)
+            //        + " " + r.o + " " + r.h + " " + r.l + " " + r.c);
+        }
+    return r;
+    }
+
+    public static Trend checkTrend(String table, int id, int period, int percent) throws SQLException, ParseException {
+    OHLC c1 = new OHLC();
+    c1 = getCandle(table,id);
+    double av1 = (c1.l+c1.h)/2;
+    c1 = getCandle(table,id-period);
+    double av2 = (c1.l+c1.h)/2;
+    double per = av2*100/av1;
+    //System.out.println(per);
+    double res = 100 - per;
+    if (res<=-percent) return Trend.BEAR;
+    if (res>=percent) return Trend.BULL;
+    return Trend.FLAT;
+    }
+
+    public static PinBar checkPB(double o, double h, double l, double c) {
+        PinBar u = new PinBar();
+        double hl30 = (h - l)*0.3;
+        if (o>=(h-hl30) & c>=(h-hl30)) {u.pb = true; u.tr = true; return u;};//System.out.println("Верхний пин-бар");
+        if (o<=(l+hl30) & c<=(l+hl30)) {u.pb = true; u.tr = false; return u;};//System.out.println("Нижний пин-бар");
+        return u;
+    }
+
+    public static boolean check0(double h, double l) {
+        double t,u;
+        t = h * 10000;
+        int t1 = (int) (t / 100);
+        u = t1/100.0;
+        //System.out.println(u);
+        if (h>=u & l<=u & ((u*10000) % 100 == 0)) return true;
+        return false;
+    }
+
+    public static OutSideBar checkOB(double h, double l, double o, double c, double h1, double l1) {
+        OutSideBar obar = new OutSideBar();
+        obar.ob = false;
+        if (h1<h & l1>l) {
+            obar.ob = true;
+            if (c>o) obar.tr = true;
+            return obar;
+        }
+        return obar;
+    }
+
+    public static void test(int begin_id, int end_id) throws SQLException, ParseException {
+        OHLC j,k;
+        PinBar pb;
+        OutSideBar ob;
+        for (int i = begin_id; i <= end_id; i++) {
+            j = getCandle("EURUSD_D1",i);
+            k = getCandle("EURUSD_D1",i-1);
+            pb = checkPB(j.o,j.h,j.l,j.c);
+            ob = checkOB(j.h,j.l,j.o,j.c,k.h,k.l);
+            if (pb.pb & check0(j.h,j.l)) System.out.println(j.date + " Pinbar trend " + pb.tr + " 0 " + check0(j.h,j.l) + " Trend " + checkTrend("EURUSD_D1",i,5,2));
+            if (ob.ob & check0(j.h,j.l)) System.out.println(j.date + " Outsidebar trend " + ob.tr + " 0 " + check0(j.h,j.l) +" Trend " + checkTrend("EURUSD_D1",i,5,2));
         }
 
     }
@@ -157,7 +246,11 @@ public class Main {
         /*Date ll = new Date(1158159600000l);
         System.out.println(ll);*/
 
-        //getCandle("EURUSD_H4","2010.12.02,08:00",false);
+        //OHLC n = getCandle("EURUSD_D1","2020.01.03,00:00",true);
+        //checkPB(n.o,n.h,n.l,n.c);
+        //System.out.println(checkTrend("EURUSD_D1",11030,10,2));
+        //System.out.println(check0(1.23934,1.22896));
+        test(10556,11146);
 
         disconnect();
 
